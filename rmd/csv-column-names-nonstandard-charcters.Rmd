@@ -1,0 +1,92 @@
+---
+title: "Inconsistent Naming Conventions CSV column names with non-standard characters"
+author: "Matt Pettis (matthew.pettis@gmail.com)"
+date: "June 19, 2018"
+output:
+  html_document:
+    code_folding: show
+    number_sections: yes
+    theme: paper
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+
+It is easy and common in Excel to make cells (like column headers) that have embedded newlines, because it makes column headers look nice.  But it wreaks havoc on using those column names as references within code.  Here, we show you how that can be fixed.
+
+
+
+# Data creation
+
+Make data with inconsistent naming conventions.
+
+```{r}
+# Setup ------------------------------------------------------------------------
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(purrrlyr))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(rprojroot))
+suppressPackageStartupMessages(library(janitor))
+
+
+# Get project root directory
+dir_proj <- find_root(has_file("PROJECT_ROOT"))
+
+
+# Create data ------------------------------------------------------------------
+set.seed(123)
+dat <- tibble(
+    cat = sample(c("red", "green", "blue"), 22, replace = TRUE)
+  , val = sin(2 * pi * seq_along(cat) / 20) + rnorm(length(dt), sd = 0.05)
+  , val2 = sin(2 * pi * seq_along(cat) / 20) + rnorm(length(dt), sd = 0.05)
+)
+
+# Make names that are problematic
+names_prob <- c(
+  "Acceleration-group\n(kg-m/s^2)"
+  , "Bayes % prob\t[breaking confidence #]"
+  , "Bayes % prob\t[breaking confidence #]"
+)
+
+# Put those names on the dataframe
+# dat <- set_names(dat, names_prob)
+dat <- setNames(dat, names_prob)
+
+glimpse(dat)
+```
+
+This data has two types of problems -- it's got embedded problematic characters, and a repeated column header.
+
+
+
+
+
+# Solution
+
+You can see that the column names here have a lot of non alpha-numeric characters, like spaces, brackets, newlines, and tabs to name a few.  We can use the `janitor::clean_names()` function to make `R` compliant names.  But it is always a good habit to store away the old names in case they are needed down the road.
+
+
+```{r}
+# Store away original column names
+colnames_orig <- names(dat)
+
+# Make new, R-usable column names
+dat <- dat %>%
+  clean_names()
+
+# Save original headers for reference, but use as the name of this vector the new, transformed names:
+colnames_orig <- set_names(colnames_orig, names(dat))
+colnames_orig %>% print()
+
+# Access old name via new name, example
+colnames_orig["bayes_percent_prob_breaking_confidence_number_2"]
+```

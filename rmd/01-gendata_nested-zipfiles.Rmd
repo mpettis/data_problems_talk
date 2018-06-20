@@ -1,0 +1,199 @@
+---
+title: "Dealing with nested zipfiles"
+author: "Matt Pettis (matthew.pettis@gmail.com)"
+date: "May 23, 2018"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: yes
+    theme: paper
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+
+The variety of ways that data can be stored and accessed is dizzying.  Getting data from other people and then getting it into your program is a discipline unto itself.  Data can be stored in text files, CSV files, XML files, JSON files, a database, accessed via an API over the web, or stored in a myriad of other proprietary formats.
+
+Beyond that, data may be collected in other meta-structures you may need to deal with, such as archive formats like zipfiles.  Any of these formats and meta-structures may be done sub-optimally, so we have to unwind the data just to start reading it in correctly.
+
+In this example, a few CSV files have been stored in zip archive files.  In addition, these zipfiles of dat have themselves been included in other zipfiles (which is sub-optimal).  Here we deal with the problem of inflating a nested structure of zip files.  This is done via bash commands, and not R itself.
+
+
+
+# Setup
+
+Let's create the nested zipfile.  It will consist of some CSV files in a hierarchical directory, one file per month, the months nested under quarters of the year.
+
+```{r include=FALSE}
+# Setup ------------------------------------------------------------------------
+library(tidyverse)
+library(purrrlyr)
+library(lubridate)
+library(rprojroot)
+
+# Get project root directory
+dir_proj <- find_root(has_file("PROJECT_ROOT"))
+
+# Create data ------------------------------------------------------------------
+set.seed(123)
+dat <- tibble(
+    dt = seq(from=ymd("2018-01-01"), to=ymd("2018-12-31"), by="day")
+  , val = sin(2 * pi * seq_along(dt) / 20) + rnorm(length(dt), sd = 0.05)
+)
+
+
+
+# list of dataframes by month
+lst_dat <- split(dat, floor_date(dat$dt, unit = "month") %>% strftime("%F"))
+
+
+
+# Remove directory
+unlink(file.path(dir_proj, "dat", "dat_01"), force = TRUE, recursive = TRUE)
+
+
+
+# Write out files
+lst_dat %>%
+  iwalk( function (.df, .nm) {
+    file_out <- file.path(dir_proj, "dat", "dat_01", sprintf("Q%d", quarter(.nm)), strftime(.nm, "%b"), .nm, sprintf("%s.csv", .nm))
+    if(!dir.exists(dirname(file_out))) dir.create(dirname(file_out), recursive = TRUE)
+    write_csv(.df, file_out)
+  })
+
+
+
+# Sequentially zip up files ----------------------------------------------------
+# Date name level
+list.files(file.path(dir_proj, "dat", "dat_01"), pattern=".csv", recursive = TRUE, full.names = TRUE) %>%
+  walk(function(.x) {
+    zip_destfile <- dirname(.x) %>% {sprintf("%s.zip", .)}
+    zip(zip_destfile, .x, flags="-j9X")
+    unlink(dirname(.x), force=TRUE, recursive = TRUE)
+  })
+
+
+
+# Month name level
+list.files(file.path(dir_proj, "dat", "dat_01"), pattern=".zip", recursive = TRUE, full.names = TRUE) %>%
+  dirname() %>%
+  unique() %>%
+  walk(function(.x) {
+    files_tozip <- list.files(.x, pattern=".zip", recursive = TRUE, full.names = TRUE)
+    zip_destfile <- sprintf("%s.zip", .x)
+    zip(zip_destfile, files_tozip, flags="-j9X")
+    unlink(.x, force = TRUE, recursive = TRUE)
+  })
+
+
+
+# Quarter name level
+list.files(file.path(dir_proj, "dat", "dat_01"), pattern=".zip", recursive = TRUE, full.names = TRUE) %>%
+  dirname() %>%
+  unique() %>%
+  walk(function(.x) {
+    files_tozip <- list.files(.x, pattern=".zip", recursive = TRUE, full.names = TRUE)
+    zip_destfile <- sprintf("%s.zip", .x)
+    zip(zip_destfile, files_tozip, flags="-j9X")
+    unlink(.x, force = TRUE, recursive = TRUE)
+  })
+
+
+
+# dat name level
+list.files(file.path(dir_proj, "dat", "dat_01"), pattern=".zip", recursive = TRUE, full.names = TRUE) %>%
+  dirname() %>%
+  unique() %>%
+  walk(function(.x) {
+    files_tozip <- list.files(.x, pattern=".zip", recursive = TRUE, full.names = TRUE)
+    zip_destfile <- sprintf("%s.zip", .x)
+    zip(zip_destfile, files_tozip, flags="-j9X")
+    unlink(.x, force = TRUE, recursive = TRUE)
+  })
+```
+
+
+`dat_01.zip` Now contains 4 zip files, `Q1.zip` through `Q4.zip`.  Each of these zip files, in turn , contain zip files with the month name (like `Jan.zip`), and each of these contains a zip file with the numeric data (`2018-01-01.zip`), and that zip file contains a CSV file with the same basename.
+
+
+
+# Solution
+
+In a simple GUI enviornment, one would normally point and click and unzip each of these files in turn.  But this is onerous and repetitive, and though doable in this case, it is easy to see that this could scale to a lot more zip files, making manual extraction not really feasible.  It is also likely that in the future you may get updates to this file, that may have more data in there.  In this case, you would have to go through the whole manual operation again to extract the data.  Or, someone else may have to do this.  It is better to have a generic process to do this.
+
+To this end, here is a bash script that will unzip a nested set of zip files in their own hierarchy.  This script is reusable in bash shells as long as the commands (like `unzip`) are available.  Having files in a nested hierarchy is not difficult to deal with in languages such as R and Python, as they have tools to recursively search directories and find files of certain types.
+
+Here is the bash script (src/unzip-inception.sh):
+
+```
+#!/usr/bin/env bash
+
+# Usage:
+# You supply the path the the root zipfile as the first argument to the shell script.
+# After that, for each zip file, the script will:
+#   Unzip the zipfile contents into a directory named the same as the zip file
+#     (same directory as the zipfile).
+#   Remove the zifile just unzipped.
+#   Search from the root zipfile directory for more zipfiles to deal with,
+#     and do the same 'unzip to same-named directory' logic just described.
+#
+# It ends when there are no more zipfiles to unzip.
+
+# From command line, get the root zip file
+ROOT_ZIPFILE="$1"
+
+# Create var for root zip directory
+ROOT_ZIPDIR=${ROOT_ZIPFILE%.zip}
+
+ZIPFILE="$ROOT_ZIPFILE"
+while true; do
+  if [ -z "$ZIPFILE" ] ; then break; fi
+
+  ZIPDIR="${ZIPFILE%.zip}"
+  unzip -d "$ZIPDIR" "$ZIPFILE"
+  rm -f "$ZIPFILE"
+
+  IFS=$'\t\n'
+  ZIPFILE=($(find "$ROOT_ZIPDIR" -name '*.zip' | head -1))
+  unset $IFS
+done
+```
+
+You run this program from a bash shell prompt as follows, assuming you are in the project root:
+
+```
+$ src/unzip-inception.sh dat/dat_01.zip
+
+Archive:  dat/dat_01.zip
+  inflating: dat/dat_01/Q1.zip
+  inflating: dat/dat_01/Q2.zip
+  inflating: dat/dat_01/Q3.zip
+  inflating: dat/dat_01/Q4.zip
+Archive:  dat/dat_01/Q1.zip
+  inflating: dat/dat_01/Q1/Feb.zip
+  inflating: dat/dat_01/Q1/Jan.zip
+  inflating: dat/dat_01/Q1/Mar.zip
+Archive:  dat/dat_01/Q1/Feb.zip
+  inflating: dat/dat_01/Q1/Feb/2018-02-01.zip
+Archive:  dat/dat_01/Q1/Feb/2018-02-01.zip
+  inflating: dat/dat_01/Q1/Feb/2018-02-01/2018-02-01.csv
+Archive:  dat/dat_01/Q1/Jan.zip
+  inflating: dat/dat_01/Q1/Jan/2018-01-01.zip
+  
+...
+
+Archive:  dat/dat_01/Q4/Oct/2018-10-01.zip
+  inflating: dat/dat_01/Q4/Oct/2018-10-01/2018-10-01.csv
+```
+
+
+

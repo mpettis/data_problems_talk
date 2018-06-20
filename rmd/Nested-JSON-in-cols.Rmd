@@ -1,0 +1,79 @@
+---
+title: "Nested JSON in columns"
+author: "Matt Pettis (matthew.pettis@gmail.com)"
+date: "June 19, 2018"
+output:
+  html_document:
+    code_folding: show
+    number_sections: yes
+    theme: paper
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+
+CSV will sometimes have JSON packed into columns.  It is helpful to understand how to turn not-necessarily table-friendly JSON into tabular format.  Let's try some.
+
+
+# Data creation
+
+```{r}
+# Setup ------------------------------------------------------------------------
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(purrrlyr))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(rprojroot))
+suppressPackageStartupMessages(library(jsonlite))
+
+
+# Get project root directory
+dir_proj <- find_root(has_file("PROJECT_ROOT"))
+
+
+# Create data ------------------------------------------------------------------
+set.seed(123)
+
+# Original data
+dat <- tibble(
+    dt = seq(from=ymd("2018-01-01"), to=ymd("2018-01-03"), by="day")
+  , val = sin(2 * pi * seq_along(dt) / 7) + rnorm(length(dt), sd = 0.05)
+)
+
+
+# Make up a column with some JSON
+dat <- dat %>%
+  mutate(json = list(a=list(b=1, c=2), d=letters[1:5]) %>% toJSON(auto_unbox=TRUE))
+
+```
+
+
+
+
+
+
+# Solution
+
+The `jsonlite` package has capabilities to turn JSON into arbitrary objects, and then base R can turn objects into data.frames:
+
+```{r}
+# https://stackoverflow.com/questions/36454638/how-can-i-convert-json-to-data-frame-in-r?rq=1
+dat %>%
+  by_row( ~ fromJSON(.x$json) %>% as.data.frame(stringsAsFactors=FALSE), .to="json_obj") %>%
+  select(-json) %>%
+  unnest()
+```
+
+For python work, see:
+
+* http://pandas.pydata.org/pandas-docs/stable/io.html#normalization
+* https://towardsdatascience.com/flattening-json-objects-in-python-f5343c794b10
+

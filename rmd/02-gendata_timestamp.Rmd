@@ -1,0 +1,103 @@
+---
+title: "Dealing with Timestamps"
+author: "Matt Pettis (matthew.pettis@gmail.com)"
+date: "May 23, 2018"
+output:
+  html_document:
+    code_folding: show
+    number_sections: yes
+    theme: paper
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+
+Timestamps may be one of the most easily mishandled data types in all of data science.  The things that make them complicated are:
+
+* **Format** Datetime values can be formatted with a huge variety.  For the date part, you can have `month-day-year`, `month/day/year`, and `year-month-date` just to name a few.  Months can have their numeric value (`01`), full name (`January`), abbreviated name (`Jan`), and so on.  Times can be military time, or have an `AM/PM` designator.  And you can mix and match a lot of these formats for an explosion of possibilities.
+* **Timezones**  Many users know that they live in a timezone, but have very little idea of how to deal with timezones programatically.  Often, users will try to directly manipulate times manually, by doing a conditional check for when a time is given, and then adding an hour to the timestamp to "leap ahead" at the correct time and stop leaping ahead on the appropriate autumn date.  *Don't do this*.  Smarter people than us have had to deal with this issue since before we were born, and have generously written fairly iron-clad libraries that can do appropriate date time conversions, and we can benefit from them by just learning how timezones work and how their API works.
+* **Default parsing**  Tied to timezones, your software will often try to help you out by assuming things about timestamps that you read in.  *Know what your software does*.  Sometimes, it assumes that datetime timestamps are coming from whatever timezone your computer is in.  Sometimes, it assumes you mean GMT/UTC/Zulu time.  You need to know what your data timestamps are correct, what your software is doing by default, and what to do if the default is not what you want.
+* **Displayed vs. Stored timestamp values**  This is a combination of some of the topics here.  You may have UTC data, tell your software to read the data in as UTC data, and then it will display it to you in your local timezone with a totally different time.  If you are like me when I didn't know what was going on, you become confused and angry.  Know that your system may have done everything correctly, reading in the data into the right timezone, but then is trying to be friendly and displaying times to you in your local timezone.  You will need to know how to check if the stored timestamp is correct, and how to display it in formats that are helpful to you.  At heart, you really need to know the difference between the display of a timestamp and the stored timestamp value/object.
+
+I have covered [Timezones and timestamps more extensively elsewhere](https://gist.github.com/mpettis/17da73874abceae57bd8394d9cf525bb).  In this section, we will focus on reading data into `R` correctly.
+
+
+
+# Loading the data
+
+We have generated some CSV files with different datetime formats via the file `src/02-gendata_timestamp.R`.  The CSV files in `dat/dat_02` all have date time formats.  By way of example:
+
+File | Example Timestamp
+---- | -----------------
+2018-05-10.csv | 2018-05-09 19:00:00
+2018-05-11.csv | 2018-05-10 07 PM
+2018-05-12.csv | 05/11/2018 19:00:00
+
+What would be nice is if our software could detect what format each file is using for its timestamp, and then parse it correctly into a an internal consistent datetime object.  
+
+What we can do is read in the data as a character string, and then parse it into a datetime object.  When we parse it, we have to tell the parsing function (`parse_date_time()` in the `lubridate` package), what the parts of the string correspond to the date time parts, like year, month, day, hour, minute, second, am/pm indicator, timezone, etc., if present.  The mini-language that lets you specify the string is laid out [here](https://www.rdocumentation.org/packages/lubridate/versions/1.7.4/topics/parse_date_time).
+
+In addition, you can assume that the timestamps were recorded in US Central time.  Below, we specify the timezone as well so that all of the timestamp information is specified.
+
+
+```{r}
+# Setup ------------------------------------------------------------------------
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(purrrlyr))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(rprojroot))
+
+# Get project root directory
+dir_proj <- find_root(has_file("PROJECT_ROOT"))
+
+# Load data files, one by one, into dataframes
+
+# First formatted file
+df_one <- read_csv(file.path(dir_proj, "dat", "dat_02", "2018-05-10.csv"), col_types = cols(val = "d", dt_fmt="c")) %>%
+  mutate(dt = parse_date_time(dt_fmt
+                              , "Ymd HMS"             # Specify the format of the timestamp string
+                              , tz="America/Chicago"  # Indicate the timezone it is in
+                              ))
+df_one
+
+# Second formatted file
+df_two <- read_csv(file.path(dir_proj, "dat", "dat_02", "2018-05-11.csv"), col_types = cols(val = "d", dt_fmt="c")) %>%
+  mutate(dt = parse_date_time(dt_fmt
+                              , "Ymd I p"             # Specify the format of the timestamp string
+                              , tz="America/Chicago"  # Indicate the timezone it is in
+                              ))
+df_two
+
+# Third formatted file
+df_three <- read_csv(file.path(dir_proj, "dat", "dat_02", "2018-05-12.csv"), col_types = cols(val = "d", dt_fmt="c")) %>%
+  mutate(dt = parse_date_time(dt_fmt
+                              , "mdY HMS"             # Specify the format of the timestamp string
+                              , tz="America/Chicago"  # Indicate the timezone it is in
+                              ))
+df_three
+```
+
+You should check that we did indeed get this into the right timezone.  How?  Let's look at the values more closely:
+
+```{r}
+print(df_two[["dt"]])
+```
+
+Note the `CDT` at the end of the datetimes.  This indicates we are in `Central Daylight Time`, which is appropriate for this date for the timezone `America/Chicago`.
+
+Note that these dates seem to indicate they should all be for the same date.  They actually are, if you are considering the time to be GMT/UTC.  How can we cast these times to see them in UTC?  We use the `lubridate::with_tz()` function, which casts a timestamp to a given timezone:
+
+
+```{r}
+print(df_two[["dt"]] %>% with_tz("UTC"))
+```
+

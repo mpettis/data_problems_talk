@@ -1,0 +1,126 @@
+---
+title: "Missing and Outlying dat"
+author: "Matt Pettis (matthew.pettis@gmail.com)"
+date: "June 19, 2018"
+output:
+  html_document:
+    code_folding: show
+    number_sections: yes
+    theme: paper
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+
+There really is no substitute for knowing your data.  And one way to know your data is to know summary statisics about it.
+
+For categorical data: what is the spectrum of values?  What are the most common values?  What are the relative proportions?
+
+For numerical data: what are the mean, median, and mode?  What are your quantiles?  What are considered outliers?
+
+In general, do you have missing data?  If so, is it expected, or does it happen where it is expected or not?
+
+Knowing your data's characteristics is the hallmark of competency in a lot of venues in life.
+
+
+# Data creation
+
+Make data with inconsistent naming conventions.
+
+```{r}
+# Setup ------------------------------------------------------------------------
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(purrrlyr))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(rprojroot))
+suppressPackageStartupMessages(library(janitor))
+suppressPackageStartupMessages(library(rvest))
+
+
+# Get project root directory
+dir_proj <- find_root(has_file("PROJECT_ROOT"))
+
+
+
+# Get the data
+# See: http://bradleyboehmke.github.io/2015/12/scraping-html-tables.html
+dat <- "https://en.wikipedia.org/wiki/List_of_songs_recorded_by_ABBA" %>%
+  read_html() %>%
+  html_nodes("table") %>%
+  .[[2]] %>%
+  html_table(fill=TRUE) %>%
+  clean_names()
+
+
+# Add some corruption
+
+# Back up a year
+dat[5, "year"] <- 1950
+
+# Add a rando song
+dat <- dat %>%
+  bind_rows(
+    tribble(
+      ~song       , ~artist_s , ~writer_s , ~album_s                                            , ~year , ~ref ,
+      "Waka Waka" , "Shakira" , "Shakira" , "Listen Up! The Official 2010 FIFA World Cup Album" , 2010  , ""
+     ))
+
+# Null out a song
+dat[44, "song"] <- NA_character_
+```
+
+
+
+
+
+
+# Solution
+
+Here are some ways to detect bad data:
+
+First, plotting values whose distribution you expect to know:
+```{r}
+ggplot(dat, aes(year)) +
+  geom_histogram(binwidth = 1) +
+  ggtitle("Histogram, Abba singles by year")
+```
+
+I know that the members of ABBA were children in 1952.  Odds are that is an outlier.
+
+
+
+
+Second, tabulating values you think you know:
+```{r}
+dat %>%
+  separate_rows(writer_s, sep="\n") %>%
+  tabyl(writer_s)
+```
+
+
+Erm... I don't think Shakira was a collaborator.  What's that row?
+
+```{r}
+dat %>%
+  filter(writer_s == "Shakira") %>%
+  glimpse()
+```
+
+
+Where do I expect non-null values?  Is that true?  I have a list of songs.  I may not have complete information about the song, like writers, or sometimes even year.  But every song should have a name.  Is that true?
+
+```{r}
+dat %>%
+  filter(is.na(song))
+```
+
+Some song is missing off of that album...

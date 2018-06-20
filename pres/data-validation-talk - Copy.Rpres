@@ -1,0 +1,66 @@
+<style>
+.reveal h1, .reveal h2, .reveal h3 {
+  word-wrap: normal;
+  -moz-hyphens: none;
+}
+</style>
+
+You Don't Get Nice Things: Real Data Problems in Data Science
+========================================================
+author: Matt Pettis
+date: June 5, 2018
+autosize: true
+
+About Me
+========================================================
+
+- Principal Data Scientist, Honeywell
+- Data science experience in IT, retail, and manufacturing
+- Occasional speaker at Twin Cities R User Group Meeting
+
+***
+Finding me:
+- Email: matthew.pettis@gmail.com
+- Twitter: @mtpettis
+- Github: mpettis
+- LinkedIn: Matt Pettis
+
+
+
+Your Data
+========================================================
+<div align="center">
+<img src="delightc.jpg" width=800 height=600>
+</div>
+
+
+Your Data
+========================================================
+![data mess](dali-persistence-of-memory.jpg)
+
+Your Data
+========================================================
+incremental: true
+
+![data mess](unzip-level-1.png)
+
+***
+![data mess](unzip-level-2.png)
+
+
+Your Data
+========================================================
+transition: none
+
+<div class="footer" style="margin-top:-150px;font-size:80%;">
+This is a zipfile inception.
+</div>
+
+![data mess](unzip-level-1.png)
+
+***
+![data mess](unzip-level-2.png)
+
+Your Data
+========================================================
+Moar

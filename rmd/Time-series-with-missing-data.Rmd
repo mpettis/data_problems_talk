@@ -1,0 +1,89 @@
+---
+title: "Time series with missing entries"
+author: "Matt Pettis (matthew.pettis@gmail.com)"
+date: "June 19, 2018"
+output:
+  html_document:
+    code_folding: show
+    number_sections: yes
+    theme: paper
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+
+Time series data is common.  Many models require that time series data be equally spaced.  If you use models like that, you should figure out if your data is actually complete and equally spaced, as well as non-duplicated.  If it isn't, can you pinpoint where?
+
+
+
+# Data creation
+
+```{r}
+# Setup ------------------------------------------------------------------------
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(purrrlyr))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(rprojroot))
+# suppressPackageStartupMessages(library(janitor))
+
+
+# Get project root directory
+dir_proj <- find_root(has_file("PROJECT_ROOT"))
+
+
+# Create data ------------------------------------------------------------------
+set.seed(123)
+
+# Original data
+dat <- tibble(
+    dt = seq(from=ymd("2018-01-01"), to=ymd("2018-05-31"), by="day")
+  , val = sin(2 * pi * seq_along(dt) / 7) + rnorm(length(dt), sd = 0.05)
+)
+
+# Duplicate some rows
+dat <- bind_rows(dat, dat[28:34,])
+
+# Delete a run of rows
+dat <- dat[-(77:88),]
+```
+
+
+
+
+
+
+# Solution
+
+Easist thing to do here is make an explicit series of the timerange in the interval that you need, and left join a count of your observations by time onto that.
+
+```{r}
+# Make a summary table, counting each row 
+dat_freq <- dat %>%
+  count(dt)
+
+dat_freq %>% print()
+
+# Create *all* expected time stamps
+full_date_seq <- seq(from=min(dat_freq$dt), to=max(dat_freq$dt), by="day")
+
+# Take full time range, left join on data we have
+dat_full <- tibble(dt=full_date_seq) %>%
+  left_join(dat_freq, "dt")
+
+# Plot the dates
+ggplot(dat_full, aes(dt, n)) +
+  geom_col(width = 0.8) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)
+        , strip.text.y = element_text(angle = 0)) +
+  scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "1 week") +
+  ggtitle("dt row frequency in data")
+```

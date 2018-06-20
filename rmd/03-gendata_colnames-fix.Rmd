@@ -1,0 +1,87 @@
+---
+title: "Dealing with Bad Column Names"
+author: "Matt Pettis (matthew.pettis@gmail.com)"
+date: "May 23, 2018"
+output:
+  html_document:
+    code_folding: show
+    number_sections: yes
+    theme: paper
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+
+One of the nice things about `R` is that columns from a data frame can be referenced like regular code names (or variables) within `R` code.  This makes it much easier to work on data columns at a time with plain `R` syntax.  However, `R` code names have particular restrictions in how they are named, such as having to start with a dot or an alphabetic character, and contain only alphanumeric characters, along with dots and underscores.  Column names from data objects like CSV files, do not have such a restriction.  In order to use column names like code names, it is helpful to have standard ways to convert CSV names, with more relaxed conventions, to `R` names that follow `R` conventions.
+
+The `janitor` package can convert column names, among other tasks, to be `R`-usable column names.  Furthermore, CSV columns can have column names repeated more than once, but names in an `R` dataframe must have unique names, and `janitor` appends numerical suffixes to make unique names when it needs to.
+
+Here we show how to do that.
+
+# Code
+
+Here we make some data with non-`R` compliant code names, and repeat the last field:
+
+```{r}
+# Setup ------------------------------------------------------------------------
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(purrrlyr))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(rprojroot))
+
+suppressPackageStartupMessages(library(janitor))
+
+
+# Get project root directory
+dir_proj <- find_root(has_file("PROJECT_ROOT"))
+
+
+
+# Create data ------------------------------------------------------------------
+set.seed(123)
+dat <- tibble(
+    cat = sample(c("red", "green", "blue"), 22, replace = TRUE)
+  , val = sin(2 * pi * seq_along(cat) / 20) + rnorm(length(dt), sd = 0.05)
+  , val2 = sin(2 * pi * seq_along(cat) / 20) + rnorm(length(dt), sd = 0.05)
+)
+
+# Make names that are problematic
+names_prob <- c(
+  "Acceleration-group\n(kg-m/s^2)"
+  , "Bayes % prob\t[breaking confidence #]"
+  , "Bayes % prob\t[breaking confidence #]"
+)
+
+# Put those names on the dataframe
+# dat <- set_names(dat, names_prob)
+dat <- setNames(dat, names_prob)
+
+glimpse(dat)
+```
+
+You can see that the column names here have a lot of non alpha-numeric characters, like spaces, brackets, newlines, and tabs to name a few.  We can use the `janitor::clean_names()` function to make `R` compliant names.  But it is always a good habit to store away the old names in case they are needed down the rowd.
+
+```{r}
+# Store away original column names
+colnames_orig <- names(dat)
+
+# Make new, R-usable column names
+dat <- dat %>%
+  clean_names()
+
+# Save original headers for reference, but use as the name of this vector the new, transformed names:
+colnames_orig <- set_names(colnames_orig, names(dat))
+colnames_orig %>% print()
+
+# Access old name via new name, example
+colnames_orig["bayes_percent_prob_breaking_confidence_number_2"]
+```

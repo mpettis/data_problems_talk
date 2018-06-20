@@ -1,0 +1,102 @@
+---
+title: "Inconsistent Naming Conventions"
+author: "Matt Pettis (matthew.pettis@gmail.com)"
+date: "June 19, 2018"
+output:
+  html_document:
+    code_folding: show
+    number_sections: yes
+    theme: paper
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+
+Sometimes you will receive files that should contain monthly data.  It would be nice if those filenames followed a pattern.  Often, they don't.  This is just one example of how to rename those files.
+
+For a good reference on how to make good and useful naming conventions, see here: http://www2.stat.duke.edu/~rcs46/lectures_2015/01-markdown-git/slides/naming-slides/naming-slides.pdf
+
+
+
+# Data creation
+
+Make data with inconsistent naming conventions.
+
+```{r}
+# Setup ------------------------------------------------------------------------
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(purrrlyr))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(rprojroot))
+# suppressPackageStartupMessages(library(janitor))
+
+
+# Get project root directory
+dir_proj <- find_root(has_file("PROJECT_ROOT"))
+
+
+
+# Create data ------------------------------------------------------------------
+set.seed(123)
+
+dat <- tibble(
+    dt = seq(from=ymd("2018-01-01"), to=ymd("2018-05-31"), by="day")
+  , val = sin(2 * pi * seq_along(dt) / 7) + rnorm(length(dt), sd = 0.05)
+)
+
+# See the data
+print(dat)
+
+# Write data to local directory ------------------------------------------------
+
+# Setup directory to write to
+dir_dat <- file.path(dir_proj, "dat", "inconsistent_naming_conventions")
+if (!dir.exists(dir_dat)) dir.create(dir_dat, recursive = TRUE)
+
+# Write out individual files
+write_csv(dat %>% filter(format(dt, "%Y-%m") == "2018-01"), file.path(dir_dat, "Jan18.csv"))
+write_csv(dat %>% filter(format(dt, "%Y-%m") == "2018-02"), file.path(dir_dat, "2018-February.csv"))
+write_csv(dat %>% filter(format(dt, "%Y-%m") == "2018-03"), file.path(dir_dat, "2018-03.csv"))
+write_csv(dat %>% filter(format(dt, "%Y-%m") == "2018-04"), file.path(dir_dat, "The-Cruelest-Month.csv"))
+write_csv(dat %>% filter(format(dt, "%Y-%m") == "2018-05"), file.path(dir_dat, "04 (May) 2018.csv"))
+```
+
+
+
+
+
+
+# Solution
+
+This is not really recommended in general, it is best to leave names as you see them.  But if you really want to, you can rename them.  I will do this if I don't expect more data, and I expect that I will pass on data to other people, and this is a way of being nice.
+
+```{r}
+# Read in the file names
+input_file_fullpaths <- list.files(dir_dat, full.names = TRUE)
+
+# Process each file.
+# Read in each file, figure out which month it belongs to, make a new consistent name
+# for file, and write out the file.
+input_file_fullpaths %>%
+  walk(function(input_filepath) {
+    # Read in file
+    datl <- read_csv(input_filepath, col_types = cols())
+    
+    # Detect what month it is from
+    year_mon_str <- datl$dt %>%
+      format("%Y-%m") %>%
+      unique()
+    
+    # Write out file with naming convention of "<yyyy-mm>.csv"
+    write_csv(datl, file.path(dir_dat, sprintf("%s.csv", year_mon_str)))
+  })
+```

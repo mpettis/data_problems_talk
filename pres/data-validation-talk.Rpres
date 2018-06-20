@@ -41,9 +41,10 @@ Resources
 Your Data
 ========================================================
 <div align="center">
-<img src="delightc.jpg" width=800 height=600>
+<img src="delightc.jpg" width=660 height=440>
 </div>
 
+Hieronymus Bosch, *The Garden of Earthly Delights*
 
 
 Take an Athletic Stance

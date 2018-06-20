@@ -30,6 +30,14 @@ Finding me:
 
 
 
+
+Resources
+========================================================
+* https://github.com/mpettis/data_problems_talk
+
+
+
+
 Your Data
 ========================================================
 <div align="center">
@@ -204,9 +212,14 @@ incremental: true
 
 
 
+
 Summary
 ========================================================
 * Get a style
 * Be opinionated
 * ... but be kind
 
+
+Resources (Repeat)
+========================================================
+* https://github.com/mpettis/data_problems_talk

@@ -146,10 +146,10 @@ incremental: true
 
 * Packages that summarize this information.
 * When possible, put this information at your fingertips.
-    ** Decimal equivalents of common fractions.
-    ** Common conversions (minutes and seconds in day, hours in week)
-    ** Reasonable magnitudes, units, and dimensions
-    ** Ways to reason quickly (https://mitpress.mit.edu/books/street-fighting-mathematics)
+    * Decimal equivalents of common fractions.
+    * Common conversions (minutes and seconds in day, hours in week)
+    * Reasonable magnitudes, units, and dimensions
+    * Ways to reason quickly (https://mitpress.mit.edu/books/street-fighting-mathematics)
 
 
 
